@@ -1,12 +1,13 @@
 import Vue from 'vue'
-import Router from 'vue-router'
+import VueRouter from 'vue-router'
 import HelloWorld from '../components/Home.vue'
 import Registre from '../components/Registre.vue'
 import Login from '../components/Login.vue'
 
-Vue.use(Router)
+Vue.use(VueRouter)
 
-export default new Router({
+const router = new VueRouter({
+  mode: 'history',
   routes: [
     {
       path: '/home',
@@ -25,3 +26,15 @@ export default new Router({
     }
   ]
 })
+
+router.beforeEach((to, from, next) => {
+  const token = localStorage.getItem('token')
+  const isHomePage = to.path === '/home'
+
+  if (!token && isHomePage) {
+    return next('/login')
+  }
+
+  next()
+})
+export default router

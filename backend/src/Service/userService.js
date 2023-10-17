@@ -36,7 +36,7 @@ module.exports.loginUserDBService = async (userLogDetails) => {
         if (result !== null) {
             const decrypted = encryptor.decrypt(result.password);
             if (decrypted === userLogDetails.password) {
-                return { status: true, message: "User validated successfully" };
+                return {  status: true, message: "User validated successfully"};
             } else {
                 throw { status: false, message: "User validation failed" };
             }

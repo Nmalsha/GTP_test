@@ -2,6 +2,7 @@
  <div class="container">
       <div class="row">
         <div class="col-md-8">
+          <button  class="btn btn-warning"  @click="logout()">logout</button>
             <h1 align="center" >INTERFACE DE SAISIE</h1>
         <div class="col-md-7">
           <form @submit.prevent="save" class="form">
@@ -57,7 +58,6 @@
 <table class="table table-dark">
   <thead>
     <tr>
-      <th scope="col">ID</th>
       <th scope="col">Label</th>
       <th scope="col">Heure de début</th>
       <th scope="col">Heure de fin</th>
@@ -66,7 +66,6 @@
   </thead>
   <tbody>
     <tr v-for="task in result" v-bind:key="task.id">
-      <th scope="row">{{task._id}}</th>
       <td>{{task.label}}</td>
       <td>{{formatDate(task.startTime)}}</td>
       <td>{{formatDate(task.endTime)}}</td>
@@ -81,23 +80,20 @@
 <table class="table table-dark">
 <thead>
     <tr>
-      <th scope="col">Tàche id</th>
       <th scope="col">Tàche</th>
       <th scope="col">Houre Total de tache</th>
       <th scope="col">Select Assigned User</th>
       <th scope="col">Assigned Task</th>
       <th scope="col">Assigned User</th>
-      <th scope="col">Remaining Hours</th>
     </tr>
   </thead>
   <tbody>
     <tr v-for="task in result" v-bind:key="task.id">
-      <td>{{task._id}}</td>
       <td>{{task.label}}</td>
       <td>{{ calculateTotalHours(task.startTime, task.endTime) }}</td>
       <td>
   <div class="form-group mt-3" align="right">
-    <select  v-model="task.selectedUser" @change="assignTaskToUser(task._id, task)">
+    <select  v-model="task.selectedUser"  @change="assignTaskToUser(task._id, task)">
        <option v-for="user in users"
                  v-bind:key="user.id"
                 :disabled="isUserAlreadyAssigned(user.firstname)">
@@ -106,15 +102,18 @@
   </div>
 </td>
 <td>{{  task.assignedTask ? task.assignedTask : "No Assigned task"}}</td>
-<td>{{ task.assignedUser ? task.assignedUser.firstname : "Not Assigned user" }}</td>
-<td>{{ task.remainingHours ? task.remainingHours : 'N/A' }}</td>
 <td>
-          <ul v-if="task.assignedUser && task.assignedUser.assignedTasks.length > 0">
-            <li v-for="task in task.assignedUser.assignedTasks" :key="task.id">{{ task.id }}</li>
-          </ul>
-        </td>
+  <template v-if="task.assignedUser && task.assignedUser.length > 0">
+    <span v-for="(user, index) in task.assignedUser" :key="index">
+      {{ user.firstname }}{{ index < task.assignedUser.length - 1 ? ', ' : '' }}
+    </span>
+  </template>
+  <template v-else>
+    Not Assigned user
+  </template>
+</td>
         <td>
-  <button  class="btn btn-warning" v-if="task.selectedUser" @click="finishWork(task, task.selectedUser )">Finish Work</button>
+  <button  class="btn btn-warning" v-if="task.selectedUser" @click="finishWork(task, task.selectedUser )">Reset</button>
 </td>
     </tr>
   </tbody>
@@ -253,7 +252,6 @@ export default {
         startTime: moment(this.task.startTime).format('YYYY-MM-DDTHH:mm'),
         endTime: moment(this.task.endTime).format('YYYY-MM-DDTHH:mm')
       }
-      console.log('End Timefrom front:', formattedTask)
       axios.post('http://localhost:8000/data/create', formattedTask)
         .then(
           (response) => {
@@ -287,34 +285,55 @@ export default {
       if (user) {
         const taskHours = this.calculateTotalHours(task.startTime, task.endTime)
         console.log('taskHours', taskHours)
-        if (taskHours > 8) {
+        if (taskHours < 8) {
           const confirmation = window.confirm(
             `Are you sure you want to assign ${task.selectedUser} to this task?`
           )
           if (confirmation) {
             const restHours = taskHours - 8
+            const usersToAssign = []
             task.remainingHours = restHours
-            console.log('restHours', restHours)
             user.assignedTasks.push(task)
             task.assignedTask = task.label
-            task.assignedUser = user
-            // Instead of finish button we can start a timer to be started as soon as a task attached to a user
+            user.workingHours -= taskHours
+            if (!task.assignedUser) {
+              task.assignedUser = []
+            }
+            task.assignedUser.push(user)
+            usersToAssign.push(user)
           }
         } else {
           const workingHours = 8
-          if (taskHours < workingHours) {
-            // Assign task to user
-            const confirmation = window.confirm(
-              `Are you sure you want to assign ${task.selectedUser} to this task?`
-            )
+          let remainingHours = taskHours
+          const usersToAssign = []
+          const maxUsers = Math.ceil(taskHours / workingHours)
 
-            if (confirmation) {
-              const restHours = taskHours - 8
-              task.remainingHours = restHours
-              user.assignedTasks.push(task)
-              task.assignedTask = task.label
-              user.workingHours -= taskHours
-              task.assignedUser = user
+          while (remainingHours > 0 && usersToAssign.length < maxUsers) {
+            const selectedUser = prompt('Enter the name of the user to assign to this task:')
+            if (selectedUser) {
+              const user = this.users.find(u => u.firstname === selectedUser && (!u.assignedTasks.includes(task) || u.workingHours < workingHours))
+              if (user) {
+                let assignedHours = remainingHours
+                if (usersToAssign.length === maxUsers - 1) {
+                  assignedHours = Math.min(remainingHours, workingHours)
+                } else {
+                  assignedHours = Math.min(remainingHours, workingHours)
+                }
+                user.assignedTasks.push(task)
+                task.assignedTask = task.label
+                if (!task.assignedUser) {
+                  task.assignedUser = []
+                }
+                task.assignedUser.push(user)
+                remainingHours -= assignedHours
+                task.remainingHours = remainingHours
+                usersToAssign.push(user)
+                console.log('task.remainingHours1', task.remainingHours)
+              } else {
+                alert('User not found or already assigned to the task. Please try again.')
+              }
+            } else {
+              alert('No user entered. Please try again.')
             }
           }
         }
@@ -322,15 +341,19 @@ export default {
     },
     isUserAlreadyAssigned (username) {
       for (const task of this.result) {
-        if (task.assignedUser && task.assignedUser.firstname  == username) {
+        if (Array.isArray(task.assignedUser)) {
+          for (const user of task.assignedUser) {
+            if (user.firstname === username) {
+              return true
+            }
+          }
+        } else if (task.assignedUser && task.assignedUser.firstname === username) {
           return true
         }
       }
       return false
     },
     finishWork (task) {
-      console.log(task)
-      console.log('task.assignedUser', task.assignedUser)
       if (task.assignedUser) {
         const user = task.assignedUser
         user.workingHours += this.calculateTotalHours(task.startTime, task.endTime)
@@ -350,7 +373,6 @@ export default {
       axios.get(userPage)
         .then(
           (response) => {
-            console.log('users', response.data.data)
             try {
               if (response.status === 200) {
                 alert('Data get successfull')
@@ -370,11 +392,14 @@ export default {
         )
     },
     remove (task) {
-      console.log(task._id)
-      const url = `http://localhost:8000/data/delete/${task._id}`      
+      const url = `http://localhost:8000/data/delete/${task._id}`
       axios.delete(url)
       alert('Task deleted')
       this.getAllDatas()
+    },
+    logout () {
+      localStorage.removeItem('userEmail')
+      this.$router.push('/login')
     }
 
   }

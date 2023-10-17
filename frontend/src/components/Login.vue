@@ -61,26 +61,28 @@ export default {
       axios.post('http://localhost:8000/user/login', this.user)
         .then(
           (response) => {
-            console.log(response.status)
-            try {
-              if (response.status === 200) {
-                this.$router.push('/home')
-              } else {
-                alert('Login failed')
-                this.$router.push('/login')
-              }
-            } catch (error) {
-              alert('Please try again')
+            // const { data } = response
+            console.log('token', response.data.token)
+
+            const token = response.data.token
+            localStorage.setItem('token', JSON.stringify(token))
+            
+            const getToken = localStorage.getItem('token')
+            console.log('getToken', getToken)
+            if (getToken) {
+              this.$router.push('/home')
+            } else {
+              alert('Login failed')
               this.$router.push('/login')
             }
-          }
-        )
+          })
         .catch((error) => {
           console.log(error)
           alert('An error occurred. Please check your input and try again.')
           this.$router.push('/login')
         })
     }
+
   }
 
 }
